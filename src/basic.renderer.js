@@ -34,10 +34,17 @@
                     if (primitive.shape == "circle"){
                         var circle = new Circle(primitive);
                         for (var triangle of circle.triangulate()){
-                            console.log(triangle);
                             preprop_scene.push( triangle );
                         }
-                    } 
+                    } else if (primitive.shape == "triangle"){
+                        var triangle = new Triangle(primitive.vertices, primitive.color);
+                        preprop_scene.push( triangle );
+                    } else if (primitive.shape == "polygon"){
+                        var polygon = new Polygon(primitive.vertices, primitive.color);
+                        for (var triangle of polygon.triangulate()){
+                            preprop_scene.push( triangle );
+                        }
+                    }
                 }
                 return preprop_scene;
             },
@@ -59,7 +66,6 @@
                             var y = j + 0.5;
 
                             if ( triangle.is_point_inside(x, y) ) {
-                                console.log("Inside!");
                                 color = nj.array(triangle.color);
                                 this.set_pixel( i, this.height - (j + 1), color );
                             }
@@ -67,8 +73,6 @@
                     }
                 }
                 
-               
-              
             },
 
             set_pixel: function( i, j, colorarr ) {
@@ -118,6 +122,20 @@
     
         is_point_inside(x, y){
             return Math.pow(x-this.center_x, 2) + Math.pow(y-this.center_y, 2) <  Math.pow(this.radius, 2);
+        }
+
+        get_bounding_box(){
+            var result = {
+                'x' : {
+                    'min' : Math.round(this.center_x - this.radius),
+                    'max' : Math.round(this.center_x + this.radius)
+                },
+                'y' : {
+                    'min' : Math.round(this.center_y - this.radius),
+                    'max' : Math.round(this.center_y + this.radius)
+                }
+            };
+            return result;
         }
     }
     
