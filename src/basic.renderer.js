@@ -1,4 +1,9 @@
 
+/* ------------------------------------------------------------ */
+/* ---Autor: Pedro Vitor Marques Nascimento-------------------- */
+/* ---DRE: 116037448--Disciplina: Computação Gráfica 2020/2---- */
+/* ------------------------------------------------------------ */
+
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
 	typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -7,12 +12,9 @@
 
 
 /* ------------------------------------------------------------ */
-
        
     function inside( x, y, primitive) {
-        var circle = new Circle(0, 0, 5);
-        var triangles = circle.triangulate();
-        console.log("T: " + triangles.length)
+        // Descontinuada, pois cada classe de objeto implementa seu `is_point_inside(x,y)`
         return false
     }
     
@@ -27,26 +29,38 @@
 
             preprocess: function(scene) {
                 
-                var preprop_scene = [];
-
+                var triangulatedScene = [];
                 for( var primitive of scene ) {  
-
+                    var triangles = [];
+                    
+                    // Triangulação
                     if (primitive.shape == "circle"){
                         var circle = new Circle(primitive);
-                        for (var triangle of circle.triangulate()){
-                            preprop_scene.push( triangle );
-                        }
+                        triangles = circle.triangulate()
                     } else if (primitive.shape == "triangle"){
-                        var triangle = new Triangle(primitive.vertices, primitive.color);
-                        preprop_scene.push( triangle );
+                        triangles = [new Triangle(primitive.vertices, primitive.color)];
                     } else if (primitive.shape == "polygon"){
                         var polygon = new Polygon(primitive.vertices, primitive.color);
-                        for (var triangle of polygon.triangulate()){
-                            preprop_scene.push( triangle );
+                        triangles = polygon.triangulate()
+                    }
+
+                    // Aplica transformações afins, caso exista
+                    var hasTransformation = primitive.hasOwnProperty('xform');
+                    if (hasTransformation){
+                        var transformation = primitive.xform;
+                        console.log(transformation);
+                        for (var i = 0; i < triangles.length; i++){
+                            triangles[i].apply_linear_transformation(transformation);
                         }
+                        console.log(triangles);
+                    }
+                    
+                    // Salva
+                    for (var triangle of triangles){
+                        triangulatedScene.push( triangle );
                     }
                 }
-                return preprop_scene;
+                return triangulatedScene;
             },
 
             createImage: function() {
@@ -55,16 +69,20 @@
 
             rasterize: function() {
                 var color;
-         
+                
+                //Para cada triângulo da scene
                 for( var triangle of this.triangles ) {
                     var bounding_box = triangle.get_bounding_box();
-
+                    
+                    // Utiliza a bounding_box para um limite e um teto na horizontal
                     for (var i = bounding_box['x']['min']; i < bounding_box['x']['max']; i++) {
                         var x = i + 0.5;
 
+                        // Utiliza a bounding_box para um limite e um teto na vertical
                         for( var j = bounding_box['y']['min']; j < bounding_box['y']['max']; j++) {
                             var y = j + 0.5;
 
+                            // Pinta apenas se estiver dentro do triângulo
                             if ( triangle.is_point_inside(x, y) ) {
                                 color = nj.array(triangle.color);
                                 this.set_pixel( i, this.height - (j + 1), color );
@@ -91,6 +109,10 @@
 
     exports.Screen = Screen;
 
+    /* ------------------------------------------------------------ */
+    /* ----------------FUNÇÕES E CLASSES AUXILIARES---------------- */
+    /* ------------------------------------------------------------ */
+
     class Circle {
         constructor(primitive_dictionary){
             this.center_x = primitive_dictionary.center[0];
@@ -99,7 +121,11 @@
             this.color = primitive_dictionary.color;
         }
     
-        triangulate(num_slices = 12){
+        triangulate(num_slices = 20){
+            // Utiliza equação paramétrica para encontrar pontos na circunferência e cria
+            // triângulos com eles.
+            // num_slices = Número de pontos que vão aproximar a circunferência.
+
             var angle_per_slice = 2 * Math.PI / num_slices;
             
             var points = [];
@@ -121,10 +147,14 @@
         }
     
         is_point_inside(x, y){
+            // Utiliza equação implícita para definir se o ponto está dentro da circunferência
+
             return Math.pow(x-this.center_x, 2) + Math.pow(y-this.center_y, 2) <  Math.pow(this.radius, 2);
         }
 
         get_bounding_box(){
+            // gera menor retângulo que encapsula a circunferência
+
             var result = {
                 'x' : {
                     'min' : Math.round(this.center_x - this.radius),
@@ -146,7 +176,23 @@
         }
     
         triangulate(){
-            // Divide o polígono em uma lista de triangulos (Triangle)
+            // Utiliza Fan Triangulation para triangular poligono.
+
+            return this.fan_triangulation(this.points);
+        }
+
+        fan_triangulation(points){
+            // Escolhe um ponto com 'centro' e traça triângulos a partir dele.
+
+            var center_point = points[0];
+            var triangles = [];
+
+            for (var i = 1; i < points.length-1; i++){
+                var current_point = points[i];
+                var next_point = points[(i+1) % points.length]
+                triangles.push(new Triangle([center_point, current_point, next_point], this.color));
+            }
+            return triangles;
         }
     }
     
@@ -157,6 +203,8 @@
         }
     
         is_point_inside(x,y){
+            // Determina se um ponto está dentro usando produto vetorial
+
             var success = 0;
     
             for(var i = 0; i < this.points.length; i++){
@@ -173,9 +221,13 @@
                     success--;
                 }
             }
+
+            // Se todos estão apontando para o mesmo lado (ou todos positivos, ou todos negativos)
             return Math.abs(success) == this.points.length;
         }
         get_bounding_box(){
+            // Gera menor retângulo que encapsula o triângulo
+
             var min_x = this.points[0][0]
             var min_y = this.points[0][1];
             var max_x = this.points[0][0];
@@ -204,13 +256,32 @@
             };
             return result;
         }
+        apply_linear_transformation(transformation){
+            // Aplica transformação linear nos vértices do retângulo
+
+            for (var i = 0; i < this.points.length; i++){
+                this.points[i] = transform_point(this.points[i], transformation);
+            }
+        }
     }
     
     function cross_product(firstVector, secondVector){
+        // Faz produto vetorial de dois vetores 2D
+
         return [
             firstVector[1] * secondVector[2] - firstVector[2] * secondVector[1],
             firstVector[2] * secondVector[0] - firstVector[0] * secondVector[2],
             firstVector[0] * secondVector[1] - firstVector[1] * secondVector[0]
+        ];
+    }
+
+    function transform_point(point, transformation){
+        // Faz produto de matriz do ponto e da transformação
+
+        var point_vector = [point[0], point[1], 0];
+        return [
+            point_vector[0]*transformation[0][0] + point_vector[1]*transformation[0][1] + point_vector[2]*transformation[0][2],
+            point_vector[0]*transformation[1][0] + point_vector[1]*transformation[1][1] + point_vector[2]*transformation[1][2]
         ];
     }
     
