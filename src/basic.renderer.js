@@ -48,11 +48,11 @@
                     var hasTransformation = primitive.hasOwnProperty('xform');
                     if (hasTransformation){
                         var transformation = primitive.xform;
-                        console.log(transformation);
+                        //console.log(transformation);
                         for (var i = 0; i < triangles.length; i++){
                             triangles[i].apply_linear_transformation(transformation);
                         }
-                        console.log(triangles);
+                        //console.log(triangles);
                     }
                     
                     // Salva
@@ -258,9 +258,13 @@
         }
         apply_linear_transformation(transformation){
             // Aplica transformação linear nos vértices do retângulo
+            console.log("Aplicando");
+            console.log(transformation);
 
             for (var i = 0; i < this.points.length; i++){
+                console.log(this.points[i])
                 this.points[i] = transform_point(this.points[i], transformation);
+                console.log(this.points[i]);
             }
         }
     }
@@ -278,7 +282,7 @@
     function transform_point(point, transformation){
         // Faz produto de matriz do ponto e da transformação
 
-        var point_vector = [point[0], point[1], 0];
+        var point_vector = [point[0], point[1], 1];
         return [
             point_vector[0]*transformation[0][0] + point_vector[1]*transformation[0][1] + point_vector[2]*transformation[0][2],
             point_vector[0]*transformation[1][0] + point_vector[1]*transformation[1][1] + point_vector[2]*transformation[1][2]
